@@ -44,6 +44,26 @@ namespace SalesforceManager.Services.Salesforce
                 ?? new SalesforceUsersResponse();
         }
 
+        internal async Task PatchUserIsActiveAsync(string userId, bool isActive, CancellationToken cancellationToken = default)
+        {
+            var tokenResponse = await AuthenticateAsync(cancellationToken);
+            var patchUrl = $"{tokenResponse.InstanceUrl}/services/data/v53.0/sobjects/User/{Uri.EscapeDataString(userId)}";
+            using var request = new HttpRequestMessage(HttpMethod.Patch, patchUrl)
+            {
+                Content = JsonContent.Create(new
+                {
+                    IsActive = isActive
+                })
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenResponse.AccessToken);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException(payload);
+        }
+
         internal async Task<SalesforceRolesResponse> GetRolesAsync(CancellationToken cancellationToken = default)
         {
             var tokenResponse = await AuthenticateAsync(cancellationToken);
@@ -65,26 +85,6 @@ namespace SalesforceManager.Services.Salesforce
 
             return JsonSerializer.Deserialize<SalesforceRolesResponse>(payload, JsonOptions)
                 ?? new SalesforceRolesResponse();
-        }
-
-        internal async Task PatchUserIsActiveAsync(string userId, bool isActive, CancellationToken cancellationToken = default)
-        {
-            var tokenResponse = await AuthenticateAsync(cancellationToken);
-            var patchUrl = $"{tokenResponse.InstanceUrl}/services/data/v53.0/sobjects/User/{Uri.EscapeDataString(userId)}";
-            using var request = new HttpRequestMessage(HttpMethod.Patch, patchUrl)
-            {
-                Content = JsonContent.Create(new
-                {
-                    IsActive = isActive
-                })
-            };
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenResponse.AccessToken);
-
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
-            var payload = await response.Content.ReadAsStringAsync(cancellationToken);
-
-            if (!response.IsSuccessStatusCode)
-                throw new InvalidOperationException(payload);
         }
         
         private async Task<SalesforceTokenResponse> AuthenticateAsync(CancellationToken cancellationToken)
