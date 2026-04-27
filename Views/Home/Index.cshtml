@@ -53,7 +53,6 @@ else
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Confirm status change</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p id="userActiveConfirmMessage" class="mb-0"></p>
@@ -66,14 +65,47 @@ else
     </div>
 </div>
 
+<div class="modal fade" id="userActiveErrorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update failed</h5>
+            </div>
+            <div class="modal-body">
+                <p id="userActiveErrorMessage" class="mb-0"></p>
+                <p id="userActiveErrorDetail" 
+                    class="mb-0" 
+                    style="
+                        font-family:Consolas,'Courier New',monospace;
+                        font-size:10px;
+                        white-space:pre-wrap;
+                        padding:8px;
+                        margin-top:8px;
+                        margin-bottom:0;
+                        border-radius:4px;
+                        ">
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         const confirmModalElement = document.getElementById("userActiveConfirmModal");
         const confirmMessageElement = document.getElementById("userActiveConfirmMessage");
         const confirmButton = document.getElementById("confirmUserActiveChangeBtn");
+        const errorModalElement = document.getElementById("userActiveErrorModal");
+        const errorMessageElement = document.getElementById("userActiveErrorMessage");
+        const errorDetailElement = document.getElementById("userActiveErrorDetail");
         const canUseBootstrapModal = typeof window.bootstrap !== "undefined" && confirmModalElement;
         const confirmModal = canUseBootstrapModal ? new window.bootstrap.Modal(confirmModalElement) : null;
+        const errorModal = canUseBootstrapModal && errorModalElement ? new window.bootstrap.Modal(errorModalElement) : null;
         let pendingChange = null;
+
 
         async function submitUserActiveChange(checkbox, userId) {
             const previousChecked = !checkbox.checked;
@@ -92,11 +124,15 @@ else
 
                 if (!response.ok) {
                     const text = await response.text();
-                    throw new Error(JSON.parse(text.message));
+                    const errorBody = JSON.parse(text);
+                    throw new Error(errorBody.detail);
                 }
             } catch (error) {
                 checkbox.checked = previousChecked;
-                alert(`${error}`);
+                const message = `Unable to ${previousChecked ? "activate" : "deactivate"} user`;
+                errorMessageElement.textContent = message;
+                errorDetailElement.textContent = error.message;
+                errorModal.show();
             } finally {
                 checkbox.disabled = false;
             }
