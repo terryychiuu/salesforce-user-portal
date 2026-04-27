@@ -1,0 +1,153 @@
+@model IReadOnlyList<SalesforceManager.Models.SalesforceUserDto>
+@{
+    ViewData["Title"] = "Home Page";
+}
+
+
+<h2>Salesforce Users</h2>
+@if (!string.IsNullOrWhiteSpace(ViewBag.ErrorMessage))
+{
+    <div class="alert alert-danger">@ViewBag.ErrorMessage</div>
+}
+
+@if (Model == null || Model.Count == 0)
+{
+    <p>No users found.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Username</th>
+                <th>Last Login</th>
+                <th>Role</th>
+                <th>Active</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var user in Model)
+        {
+            <tr>
+                <td>@user.Name</td>
+                <td>@user.Username</td>
+                <td>@user.LastLoginDate</td>
+                <td>@user.UserRoleId</td>
+                <td>
+                    <input
+                        type="checkbox"
+                        class="js-user-active"
+                        data-user-id="@user.Id"
+                        data-user-name="@user.Name"
+                        @(user.IsActive ? "checked" : "") />
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+<div class="modal fade" id="userActiveConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm status change</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="userActiveConfirmMessage" class="mb-0"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmUserActiveChangeBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const confirmModalElement = document.getElementById("userActiveConfirmModal");
+        const confirmMessageElement = document.getElementById("userActiveConfirmMessage");
+        const confirmButton = document.getElementById("confirmUserActiveChangeBtn");
+        const canUseBootstrapModal = typeof window.bootstrap !== "undefined" && confirmModalElement;
+        const confirmModal = canUseBootstrapModal ? new window.bootstrap.Modal(confirmModalElement) : null;
+        let pendingChange = null;
+
+        async function submitUserActiveChange(checkbox, userId) {
+            const previousChecked = !checkbox.checked;
+            checkbox.disabled = true;
+
+            try {
+                const response = await fetch(`/api/sf/users/${encodeURIComponent(userId)}/active`, {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        inactive: !checkbox.checked
+                    })
+                });
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(JSON.parse(text.message));
+                }
+            } catch (error) {
+                checkbox.checked = previousChecked;
+                alert(`${error}`);
+            } finally {
+                checkbox.disabled = false;
+            }
+        }
+
+        document.addEventListener("change", function (event) {
+            const checkbox = event.target;
+            if (!(checkbox instanceof HTMLInputElement) || !checkbox.classList.contains("js-user-active")) {
+                return;
+            }
+
+            const userId = checkbox.dataset.userId;
+            if (!userId) {
+                return;
+            }
+
+            if (!confirmModal || !confirmMessageElement || !confirmButton) {
+                submitUserActiveChange(checkbox, userId);
+                return;
+            }
+
+            const previousChecked = !checkbox.checked;
+            const actionText = checkbox.checked ? "activate" : "deactivate";
+            const userName = checkbox.dataset.userName || "this user";
+            confirmMessageElement.textContent = `Are you sure you want to ${actionText} ${userName}?`;
+            pendingChange = { checkbox, userId, previousChecked };
+            confirmModal.show();
+        });
+
+        if (confirmModalElement) {
+            confirmModalElement.addEventListener("hidden.bs.modal", function () {
+                if (!pendingChange) {
+                    return;
+                }
+
+                pendingChange.checkbox.checked = pendingChange.previousChecked;
+                pendingChange = null;
+            });
+        }
+
+        if (confirmButton) {
+            confirmButton.addEventListener("click", async function () {
+                if (!pendingChange) {
+                    return;
+                }
+
+                const currentChange = pendingChange;
+                pendingChange = null;
+                confirmModal.hide();
+                await submitUserActiveChange(currentChange.checkbox, currentChange.userId);
+            });
+        }
+    });
+</script>
