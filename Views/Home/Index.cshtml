@@ -267,32 +267,21 @@ else
             });
         }
 
-        function setSortButtonsDisabled(disabled) {
-            sortButtons.forEach(function (button) {
-                button.disabled = disabled;
+        function setControlsDisabled(disabled, controls) {
+            controls.forEach(function (control) {
+                if (control instanceof HTMLInputElement || control instanceof HTMLButtonElement || control instanceof HTMLSelectElement) {
+                    control.disabled = disabled;
+                    return;
+                }
+
+                if (control && typeof control.forEach === "function") {
+                    control.forEach(function (nestedControl) {
+                        if (nestedControl instanceof HTMLButtonElement) {
+                            nestedControl.disabled = disabled;
+                        }
+                    });
+                }
             });
-        }
-
-        function setSearchControlsDisabled(disabled) {
-            if (userSearchInput instanceof HTMLInputElement) {
-                userSearchInput.disabled = disabled;
-            }
-
-            if (userSearchButton instanceof HTMLButtonElement) {
-                userSearchButton.disabled = disabled;
-            }
-        }
-
-        function setRoleSelectDisabled(disabled) {
-            if (userRoleSelect instanceof HTMLSelectElement) {
-                userRoleSelect.disabled = disabled;
-            }
-        }
-
-        function setStatusSelectDisabled(disabled) {
-            if (userStatusSelect instanceof HTMLSelectElement) {
-                userStatusSelect.disabled = disabled;
-            }
         }
 
         function buildUsersQuery(
@@ -336,10 +325,7 @@ else
             );
             // console.log(query.toString());
 
-            setSortButtonsDisabled(true);
-            setSearchControlsDisabled(true);
-            setRoleSelectDisabled(true);
-            setStatusSelectDisabled(true);
+            setControlsDisabled(true, [sortButtons, userSearchInput, userSearchButton, userRoleSelect, userStatusSelect]);
 
             try {
                 const response = await fetch(`/api/sf/users?${query.toString()}`);
@@ -354,10 +340,7 @@ else
             } catch (error) {
                 showError("Unable to sort users", error.message);
             } finally {
-                setSortButtonsDisabled(false);
-                setSearchControlsDisabled(false);
-                setRoleSelectDisabled(false);
-                setStatusSelectDisabled(false);
+                setControlsDisabled(false, [sortButtons, userSearchInput, userSearchButton, userRoleSelect, userStatusSelect]);
             }
         }
 
@@ -370,8 +353,7 @@ else
                 userRoleSelect.value, 
                 userStatusSelect.value
             );
-            setSortButtonsDisabled(true);
-            setSearchControlsDisabled(true);
+            setControlsDisabled(true, [sortButtons, userSearchInput, userSearchButton]);
 
             try {
                 const response = await fetch(`/api/sf/users?${query.toString()}`);
@@ -385,8 +367,7 @@ else
             } catch (error) {
                 showError("Unable to search users", error.message);
             } finally {
-                setSortButtonsDisabled(false);
-                setSearchControlsDisabled(false);
+                setControlsDisabled(false, [sortButtons, userSearchInput, userSearchButton]);
             }
         }
 
@@ -398,10 +379,7 @@ else
                 userRoleSelect.value,
                 userStatusSelect.value
             );
-            setSortButtonsDisabled(true);
-            setSearchControlsDisabled(true);
-            setRoleSelectDisabled(true);
-            setStatusSelectDisabled(true);
+            setControlsDisabled(true, [sortButtons, userSearchInput, userSearchButton, userRoleSelect, userStatusSelect]);
 
             try {
                 const response = await fetch(`/api/sf/users?${query.toString()}`);
@@ -414,10 +392,7 @@ else
             } catch (error) {
                 showError("Unable to filter users", error.message);
             } finally {
-                setSortButtonsDisabled(false);
-                setSearchControlsDisabled(false);
-                setRoleSelectDisabled(false);
-                setStatusSelectDisabled(false);
+                setControlsDisabled(false, [sortButtons, userSearchInput, userSearchButton, userRoleSelect, userStatusSelect]);
             }
         }
 
