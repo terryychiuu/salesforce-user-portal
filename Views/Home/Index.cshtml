@@ -19,21 +19,41 @@ else
     <table class="table">
         <thead>
             <tr>
-                <th>Name</th>
-                <th>Username</th>
-                <th>Last Login</th>
-                <th>Role</th>
-                <th>Active</th>
+                <th>
+                    <button type="button" class="btn btn-link p-0 text-decoration-none text-nowrap js-user-sort" data-sort-by="name">
+                        Name <span class="js-sort-indicator" aria-hidden="true"></span>
+                    </button>
+                </th>
+                <th>
+                    <button type="button" class="btn btn-link p-0 text-decoration-none text-nowrap js-user-sort" data-sort-by="username">
+                        Username <span class="js-sort-indicator" aria-hidden="true"></span>
+                    </button>
+                </th>
+                <th>
+                    <button type="button" class="btn btn-link p-0 text-decoration-none text-nowrap js-user-sort" data-sort-by="lastlogindate">
+                        Last Login <span class="js-sort-indicator" aria-hidden="true"></span>
+                    </button>
+                </th>
+                <th>
+                    <button type="button" class="btn btn-link p-0 text-decoration-none text-nowrap js-user-sort" data-sort-by="role">
+                        Role <span class="js-sort-indicator" aria-hidden="true"></span>
+                    </button>
+                </th>
+                <th>
+                    <button type="button" class="btn btn-link p-0 text-decoration-none text-nowrap js-user-sort" data-sort-by="active">
+                        Active <span class="js-sort-indicator" aria-hidden="true"></span>
+                    </button>
+                </th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="salesforceUsersTableBody">
         @foreach (var user in Model)
         {
             <tr>
-                <td>@user.Name</td>
-                <td>@user.Username</td>
-                <td>@user.LastLoginDate</td>
-                <td>@user.UserRoleId</td>
+                <td class="text-nowrap">@user.Name</td>
+                <td class="text-nowrap">@user.Username</td>
+                <td class="text-nowrap">@user.LastLoginDate</td>
+                <td class="text-nowrap">@user.UserRoleId</td>
                 <td>
                     <input
                         type="checkbox"
@@ -95,6 +115,8 @@ else
 
 <script>
     document.addEventListener("DOMContentLoaded", function () {
+        const tableBody = document.getElementById("salesforceUsersTableBody");
+        const sortButtons = document.querySelectorAll(".js-user-sort");
         const confirmModalElement = document.getElementById("userActiveConfirmModal");
         const confirmMessageElement = document.getElementById("userActiveConfirmMessage");
         const confirmButton = document.getElementById("confirmUserActiveChangeBtn");
@@ -105,7 +127,138 @@ else
         const confirmModal = canUseBootstrapModal ? new window.bootstrap.Modal(confirmModalElement) : null;
         const errorModal = canUseBootstrapModal && errorModalElement ? new window.bootstrap.Modal(errorModalElement) : null;
         let pendingChange = null;
+        let currentSortBy = null;
+        let currentSortDirection = "asc";
 
+        function readUserProperty(user, camelCaseName, pascalCaseName) {
+            return user[camelCaseName] ?? user[pascalCaseName] ?? "";
+        }
+
+        function createTextCell(value) {
+            const cell = document.createElement("td");
+            cell.classList.add("text-nowrap");
+            cell.textContent = value;
+            return cell;
+        }
+
+        function createActiveCell(user) {
+            const userId = readUserProperty(user, "id", "Id");
+            const userName = readUserProperty(user, "name", "Name");
+            const isActive = Boolean(user.isActive ?? user.IsActive);
+            const cell = document.createElement("td");
+            const checkbox = document.createElement("input");
+
+            checkbox.type = "checkbox";
+            checkbox.className = "js-user-active";
+            checkbox.dataset.userId = userId;
+            checkbox.dataset.userName = userName;
+            checkbox.checked = isActive;
+            cell.appendChild(checkbox);
+
+            return cell;
+        }
+
+        function renderUsers(users) {
+            if (!tableBody) {
+                return;
+            }
+
+            tableBody.innerHTML = "";
+            users.forEach(function (user) {
+                const row = document.createElement("tr");
+                row.appendChild(createTextCell(readUserProperty(user, "name", "Name")));
+                row.appendChild(createTextCell(readUserProperty(user, "username", "Username")));
+                row.appendChild(createTextCell(readUserProperty(user, "lastLoginDate", "LastLoginDate")));
+                row.appendChild(createTextCell(readUserProperty(user, "userRoleId", "UserRoleId")));
+                row.appendChild(createActiveCell(user));
+                tableBody.appendChild(row);
+            });
+        }
+
+        function showError(message, detail) {
+            if (errorMessageElement) {
+                errorMessageElement.textContent = message;
+            }
+
+            if (errorDetailElement) {
+                errorDetailElement.textContent = detail || "";
+            }
+
+            if (errorModal) {
+                errorModal.show();
+                return;
+            }
+
+            window.alert(detail ? `${message}: ${detail}` : message);
+        }
+
+        async function readProblemDetail(response) {
+            const text = await response.text();
+            if (!text) {
+                return response.statusText;
+            }
+
+            try {
+                const errorBody = JSON.parse(text);
+                return errorBody.detail || text;
+            } catch {
+                return text;
+            }
+        }
+
+        function setSortButtonState() {
+            sortButtons.forEach(function (button) {
+                const sortBy = button.dataset.sortBy || null;
+                const isActiveSort = sortBy === currentSortBy;
+                const indicator = button.querySelector(".js-sort-indicator");
+                button.setAttribute("aria-pressed", isActiveSort ? "true" : "false");
+
+                if (indicator) {
+                    indicator.innerHTML = isActiveSort
+                        ? (currentSortDirection === "asc"
+                            ? '<i class="bi bi-sort-up-alt"></i>'
+                            : '<i class="bi bi-sort-down"></i>')
+                        : "";
+                }
+            });
+        }
+
+        function setSortButtonsDisabled(disabled) {
+            sortButtons.forEach(function (button) {
+                button.disabled = disabled;
+            });
+        }
+
+        async function sortUsers(sortBy) {
+            const nextDirection = currentSortBy === sortBy && currentSortDirection === "asc"
+                ? "desc"
+                : "asc";
+            const query = new URLSearchParams({
+                sortDirection: nextDirection
+            });
+
+            if (sortBy) {
+                query.append("sortBy", sortBy);
+            }
+
+            setSortButtonsDisabled(true);
+
+            try {
+                const response = await fetch(`/api/sf/users?${query.toString()}`);
+                if (!response.ok) {
+                    throw new Error(await readProblemDetail(response));
+                }
+
+                renderUsers(await response.json());
+                currentSortBy = sortBy;
+                currentSortDirection = nextDirection;
+                setSortButtonState();
+            } catch (error) {
+                showError("Unable to sort users", error.message);
+            } finally {
+                setSortButtonsDisabled(false);
+            }
+        }
 
         async function submitUserActiveChange(checkbox, userId) {
             const previousChecked = !checkbox.checked;
@@ -123,20 +276,23 @@ else
                 });
 
                 if (!response.ok) {
-                    const text = await response.text();
-                    const errorBody = JSON.parse(text);
-                    throw new Error(errorBody.detail);
+                    throw new Error(await readProblemDetail(response));
                 }
             } catch (error) {
                 checkbox.checked = previousChecked;
-                const message = `Unable to ${previousChecked ? "activate" : "deactivate"} user`;
-                errorMessageElement.textContent = message;
-                errorDetailElement.textContent = error.message;
-                errorModal.show();
+                const message = `Unable to ${checkbox.checked ? "deactivate" : "activate"} user`;
+                showError(message, error.message);
             } finally {
                 checkbox.disabled = false;
             }
         }
+
+        sortButtons.forEach(function (button) {
+            button.addEventListener("click", function () {
+                sortUsers(button.dataset.sortBy || null);
+            });
+        });
+        setSortButtonState();
 
         document.addEventListener("change", function (event) {
             const checkbox = event.target;

@@ -12,7 +12,7 @@ namespace SalesforceManager.Services.Salesforce.Mapping
             Name = user.Name ?? string.Empty,
             Username = user.Username ?? string.Empty,
             LastLoginDate = SalesforceDateTimeFormatter.FormatForDisplay(user.LastLoginDate),
-            UserRoleId = user.UserRoleId ?? string.Empty,
+            UserRoleId = user.UserRole?.Name ?? user.UserRoleId ?? string.Empty,
             IsActive = user.IsActive
         };
     }

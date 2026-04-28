@@ -22,6 +22,9 @@ namespace SalesforceManager.Services.Salesforce.Models
         [JsonPropertyName("UserRoleId")]
         public string? UserRoleId { get; set; }
 
+        [JsonPropertyName("UserRole")]
+        public SalesforceRoleRecord? UserRole { get; set; }
+
         [JsonPropertyName("IsActive")]
         public bool IsActive { get; set; }
     }
@@ -29,7 +32,7 @@ namespace SalesforceManager.Services.Salesforce.Models
     internal sealed class SalesforceRoleRecord
     {
         [JsonPropertyName("Id")]
-        public required string Id { get; set; }
+        public string? Id { get; set; }
 
         [JsonPropertyName("Name")]
         public string? Name { get; set; }

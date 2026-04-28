@@ -18,11 +18,14 @@ namespace SalesforceManager.Controllers
         }
 
         [HttpGet("users")]
-        public async Task<IActionResult> Users(CancellationToken cancellationToken)
+        public async Task<IActionResult> Users(
+            [FromQuery] string? sortBy,
+            [FromQuery] string? sortDirection,
+            CancellationToken cancellationToken)
         {
             try
             {
-                var users = await _salesforceService.GetUsersAsync(cancellationToken);
+                var users = await _salesforceService.GetUsersAsync(sortBy, sortDirection, cancellationToken);
                 return Ok(users);
             }
             catch (Exception ex)

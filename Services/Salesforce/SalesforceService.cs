@@ -12,34 +12,23 @@ namespace SalesforceManager.Services.Salesforce
             _salesforceApiClient = salesforceApiClient;
         }
 
-        public async Task<IReadOnlyList<SalesforceUserDto>> GetUsersAsync(CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<SalesforceUserDto>> GetUsersAsync(CancellationToken cancellationToken = default)
         {
-            var usersResponse = await _salesforceApiClient.GetUsersAsync(cancellationToken);
-            var rolesResponse = await _salesforceApiClient.GetRolesAsync(cancellationToken);
+            return GetUsersAsync(null, null, cancellationToken);
+        }
+
+        public async Task<IReadOnlyList<SalesforceUserDto>> GetUsersAsync(
+            string? sortBy,
+            string? sortDirection,
+            CancellationToken cancellationToken = default)
+        {
+            var usersResponse = await _salesforceApiClient.GetUsersAsync(sortBy, sortDirection, cancellationToken);
 
             if (usersResponse?.Records == null)
                 return Array.Empty<SalesforceUserDto>();
 
-            var roleNameById = (rolesResponse?.Records ?? [])
-                .Where(role => !string.IsNullOrWhiteSpace(role.Id))
-                .ToDictionary(
-                    role => role.Id,
-                    role => role.Name ?? string.Empty,
-                    StringComparer.OrdinalIgnoreCase);
-
             return usersResponse.Records
                 .Select(SalesforceUserMapper.ToDto)
-                .Select(user =>
-                {
-                    if (!string.IsNullOrWhiteSpace(user.UserRoleId) &&
-                        roleNameById.TryGetValue(user.UserRoleId, out var roleName) &&
-                        !string.IsNullOrWhiteSpace(roleName))
-                    {
-                        user.UserRoleId = roleName;
-                    }
-
-                    return user;
-                })
                 .ToList();
         }
 

@@ -22,13 +22,20 @@ namespace SalesforceManager.Services.Salesforce
             _config = options.Value;
         }
 
-        internal async Task<SalesforceUsersResponse> GetUsersAsync(CancellationToken cancellationToken = default)
+        internal async Task<SalesforceUsersResponse> GetUsersAsync(
+            string? sortBy = null,
+            string? sortDirection = null,
+            CancellationToken cancellationToken = default)
         {
             var tokenResponse = await AuthenticateAsync(cancellationToken);
+            var orderByField = ResolveUsersOrderByField(sortBy);
+            var orderByDirection = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase)
+                ? "DESC"
+                : "ASC";
             var soql = "" +
-                "SELECT Id, Name, Alias, Username, LastLoginDate, UserRoleId, IsActive " +
+                "SELECT Id, Name, Alias, Username, LastLoginDate, UserRoleId, UserRole.Name, IsActive " +
                 "FROM User " +
-                "ORDER BY Name";
+                $"ORDER BY {orderByField} {orderByDirection}";
             var queryUrl = $"{_config.Url}/services/data/v53.0/query?q={Uri.EscapeDataString(soql)}";
 
             using var request = new HttpRequestMessage(HttpMethod.Get, queryUrl);
@@ -42,6 +49,18 @@ namespace SalesforceManager.Services.Salesforce
 
             return JsonSerializer.Deserialize<SalesforceUsersResponse>(payload, JsonOptions) 
                 ?? new SalesforceUsersResponse();
+        }
+
+        private static string ResolveUsersOrderByField(string? sortBy)
+        {
+            return sortBy?.ToLowerInvariant() switch
+            {
+                "username" => "Username",
+                "lastlogindate" => "LastLoginDate",
+                "role" => "UserRole.Name",
+                "active" => "IsActive",
+                _ => "Name"
+            };
         }
 
         internal async Task PatchUserIsActiveAsync(string userId, bool isActive, CancellationToken cancellationToken = default)
