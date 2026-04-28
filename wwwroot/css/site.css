@@ -12,6 +12,15 @@ html {
   box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
 }
 
+#userSearchInput {
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+#userSearchInput:focus {
+  border-color: #9ec5fe;
+  box-shadow: 0 0 0 0.18rem rgba(37, 140, 251, 0.2);
+}
+
 html {
   position: relative;
   min-height: 100%;

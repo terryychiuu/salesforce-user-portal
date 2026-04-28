@@ -14,15 +14,25 @@ namespace SalesforceManager.Services.Salesforce
 
         public Task<IReadOnlyList<SalesforceUserDto>> GetUsersAsync(CancellationToken cancellationToken = default)
         {
-            return GetUsersAsync(null, null, cancellationToken);
+            return GetUsersAsync(null, null, null, null, null, cancellationToken);
         }
 
         public async Task<IReadOnlyList<SalesforceUserDto>> GetUsersAsync(
             string? sortBy,
             string? sortDirection,
+            string? search,
+            string? roleId,
+            string? status,
             CancellationToken cancellationToken = default)
         {
-            var usersResponse = await _salesforceApiClient.GetUsersAsync(sortBy, sortDirection, cancellationToken);
+            var usersResponse = await _salesforceApiClient.GetUsersAsync(
+                sortBy,
+                sortDirection,
+                search,
+                roleId,
+                status,
+                cancellationToken
+            );
 
             if (usersResponse?.Records == null)
                 return Array.Empty<SalesforceUserDto>();

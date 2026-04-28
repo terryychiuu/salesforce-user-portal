@@ -25,16 +25,52 @@ namespace SalesforceManager.Services.Salesforce
         internal async Task<SalesforceUsersResponse> GetUsersAsync(
             string? sortBy = null,
             string? sortDirection = null,
+            string? search = null,
+            string? roleId = null,
+            string? status = null,
             CancellationToken cancellationToken = default)
         {
             var tokenResponse = await AuthenticateAsync(cancellationToken);
+
             var orderByField = ResolveUsersOrderByField(sortBy);
             var orderByDirection = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase)
                 ? "DESC"
                 : "ASC";
+                
+            var conditions = new List<string>();
+            var normalizedSearch = search?.Trim();
+            string? isActive = status?.Trim().ToLowerInvariant() switch
+            {
+                "active" => "true",
+                "inactive" => "false",
+                "all" => null,
+                "" => null,
+                null => null,
+                _ => null
+            };
+
+            if (!string.IsNullOrWhiteSpace(normalizedSearch))
+            {
+                var escapedSearch = EscapeSoqlStringLiteral(normalizedSearch);
+                conditions.Add($"(Name LIKE '%{escapedSearch}%' OR Username LIKE '%{escapedSearch}%')");
+            }
+
+            if (!string.IsNullOrWhiteSpace(roleId))
+            {
+                conditions.Add($"UserRoleId = '{EscapeSoqlStringLiteral(roleId)}'");
+            }
+
+            if (!string.IsNullOrWhiteSpace(isActive))
+            {
+                conditions.Add($"IsActive = {isActive}");
+            }
+            var whereClause = conditions.Count > 0
+                ? $"WHERE {string.Join(" AND ", conditions)} "
+                : string.Empty;
             var soql = "" +
                 "SELECT Id, Name, Alias, Username, LastLoginDate, UserRoleId, UserRole.Name, IsActive " +
                 "FROM User " +
+                whereClause +
                 $"ORDER BY {orderByField} {orderByDirection}";
             var queryUrl = $"{_config.Url}/services/data/v53.0/query?q={Uri.EscapeDataString(soql)}";
 
@@ -61,6 +97,11 @@ namespace SalesforceManager.Services.Salesforce
                 "active" => "IsActive",
                 _ => "Name"
             };
+        }
+
+        private static string EscapeSoqlStringLiteral(string value)
+        {
+            return value.Replace("\\", "\\\\").Replace("'", "\\'");
         }
 
         internal async Task PatchUserIsActiveAsync(string userId, bool isActive, CancellationToken cancellationToken = default)

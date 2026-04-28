@@ -1,4 +1,4 @@
-@model IReadOnlyList<SalesforceManager.Models.SalesforceUserDto>
+@model SalesforceManager.Models.HomeViewModel
 @{
     ViewData["Title"] = "Home Page";
 }
@@ -10,12 +10,48 @@
     <div class="alert alert-danger">@ViewBag.ErrorMessage</div>
 }
 
-@if (Model == null || Model.Count == 0)
+
+
+@if (Model == null || Model.Users.Count == 0)
 {
     <p>No users found.</p>
 }
 else
 {
+    <form id="userSearchForm" class="mb-3">
+        <div class="row">
+            <div class="col-12 col-md-8">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="bi bi-search" aria-hidden="true"></i>
+                    </span>
+                    <input
+                        id="userSearchInput"
+                        type="search"
+                        class="form-control"
+                        placeholder="Search by name or username"
+                        aria-label="Search users by name or username" />
+                    <button id="userSearchButton" type="submit" class="btn btn-primary">Search</button>
+                </div>
+            </div>
+            <div class="col-12 col-md-2">
+                <select id="userRoleSelect" class="form-select">
+                    <option value="" selected>All roles</option>
+                    @foreach (var role in Model.Roles)
+                    {
+                        <option value="@role.Id">@role.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-md-2">
+                <select id="userStatusSelect" class="form-select">
+                    <option value="" selected>All statuses</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+            </div>
+        </div>
+    </form>
     <table class="table">
         <thead>
             <tr>
@@ -47,7 +83,7 @@ else
             </tr>
         </thead>
         <tbody id="salesforceUsersTableBody">
-        @foreach (var user in Model)
+        @foreach (var user in Model.Users)
         {
             <tr>
                 <td class="text-nowrap">@user.Name</td>
@@ -117,6 +153,12 @@ else
     document.addEventListener("DOMContentLoaded", function () {
         const tableBody = document.getElementById("salesforceUsersTableBody");
         const sortButtons = document.querySelectorAll(".js-user-sort");
+        const userSearchForm = document.getElementById("userSearchForm");
+        const userSearchInput = document.getElementById("userSearchInput");
+        const userSearchButton = document.getElementById("userSearchButton");
+        const userRoleSelect = document.getElementById("userRoleSelect");
+        const userStatusSelect = document.getElementById("userStatusSelect");
+
         const confirmModalElement = document.getElementById("userActiveConfirmModal");
         const confirmMessageElement = document.getElementById("userActiveConfirmMessage");
         const confirmButton = document.getElementById("confirmUserActiveChangeBtn");
@@ -126,9 +168,11 @@ else
         const canUseBootstrapModal = typeof window.bootstrap !== "undefined" && confirmModalElement;
         const confirmModal = canUseBootstrapModal ? new window.bootstrap.Modal(confirmModalElement) : null;
         const errorModal = canUseBootstrapModal && errorModalElement ? new window.bootstrap.Modal(errorModalElement) : null;
+        
         let pendingChange = null;
         let currentSortBy = null;
         let currentSortDirection = "asc";
+        let currentSearch = "";
 
         function readUserProperty(user, camelCaseName, pascalCaseName) {
             return user[camelCaseName] ?? user[pascalCaseName] ?? "";
@@ -229,19 +273,73 @@ else
             });
         }
 
+        function setSearchControlsDisabled(disabled) {
+            if (userSearchInput instanceof HTMLInputElement) {
+                userSearchInput.disabled = disabled;
+            }
+
+            if (userSearchButton instanceof HTMLButtonElement) {
+                userSearchButton.disabled = disabled;
+            }
+        }
+
+        function setRoleSelectDisabled(disabled) {
+            if (userRoleSelect instanceof HTMLSelectElement) {
+                userRoleSelect.disabled = disabled;
+            }
+        }
+
+        function setStatusSelectDisabled(disabled) {
+            if (userStatusSelect instanceof HTMLSelectElement) {
+                userStatusSelect.disabled = disabled;
+            }
+        }
+
+        function buildUsersQuery(
+            sortBy, 
+            sortDirection, 
+            search,
+            roleId,
+            status
+        ) {
+            const query = new URLSearchParams();
+
+            if (sortDirection) {
+                query.append("sortDirection", sortDirection);
+            }
+            if (sortBy) {
+                query.append("sortBy", sortBy);
+            }
+            if (search) {
+                query.append("search", search);
+            }
+            if (roleId) {
+                query.append("roleId", roleId);
+            }
+            if (status) {
+                query.append("status", status);
+            }
+
+            return query;
+        }
+
         async function sortUsers(sortBy) {
             const nextDirection = currentSortBy === sortBy && currentSortDirection === "asc"
                 ? "desc"
                 : "asc";
-            const query = new URLSearchParams({
-                sortDirection: nextDirection
-            });
-
-            if (sortBy) {
-                query.append("sortBy", sortBy);
-            }
+            const query = buildUsersQuery(
+                sortBy, 
+                nextDirection, 
+                currentSearch, 
+                userRoleSelect.value, 
+                userStatusSelect.value
+            );
+            // console.log(query.toString());
 
             setSortButtonsDisabled(true);
+            setSearchControlsDisabled(true);
+            setRoleSelectDisabled(true);
+            setStatusSelectDisabled(true);
 
             try {
                 const response = await fetch(`/api/sf/users?${query.toString()}`);
@@ -257,6 +355,69 @@ else
                 showError("Unable to sort users", error.message);
             } finally {
                 setSortButtonsDisabled(false);
+                setSearchControlsDisabled(false);
+                setRoleSelectDisabled(false);
+                setStatusSelectDisabled(false);
+            }
+        }
+
+        async function searchUsers(searchText) {
+            const normalizedSearch = (searchText || "").trim();
+            const query = buildUsersQuery(
+                currentSortBy, 
+                currentSortDirection, 
+                normalizedSearch, 
+                userRoleSelect.value, 
+                userStatusSelect.value
+            );
+            setSortButtonsDisabled(true);
+            setSearchControlsDisabled(true);
+
+            try {
+                const response = await fetch(`/api/sf/users?${query.toString()}`);
+                if (!response.ok) {
+                    throw new Error(await readProblemDetail(response));
+                }
+
+                renderUsers(await response.json());
+                currentSearch = normalizedSearch;
+                setSortButtonState();
+            } catch (error) {
+                showError("Unable to search users", error.message);
+            } finally {
+                setSortButtonsDisabled(false);
+                setSearchControlsDisabled(false);
+            }
+        }
+
+        async function filterUsers() {
+            const query = buildUsersQuery(
+                currentSortBy,
+                currentSortDirection,
+                currentSearch,
+                userRoleSelect.value,
+                userStatusSelect.value
+            );
+            setSortButtonsDisabled(true);
+            setSearchControlsDisabled(true);
+            setRoleSelectDisabled(true);
+            setStatusSelectDisabled(true);
+
+            try {
+                const response = await fetch(`/api/sf/users?${query.toString()}`);
+                if (!response.ok) {
+                    throw new Error(await readProblemDetail(response));
+                }
+
+                renderUsers(await response.json());
+                setSortButtonState();
+            } catch (error) {
+                showError("Unable to filter users", error.message);
+            } finally {
+                setSortButtonsDisabled(false);
+                setSearchControlsDisabled(false);
+                setRoleSelectDisabled(false);
+                setStatusSelectDisabled(false);
             }
         }
 
@@ -292,6 +453,36 @@ else
                 sortUsers(button.dataset.sortBy || null);
             });
         });
+
+        if (userSearchForm instanceof HTMLFormElement && userSearchInput instanceof HTMLInputElement) {
+            userSearchForm.addEventListener("submit", function (event) {
+                event.preventDefault();
+                searchUsers(userSearchInput.value);
+            });
+            userSearchInput.addEventListener("search", function () {
+                if (userSearchInput.value.trim() === "" && currentSearch !== "") {
+                    searchUsers("");
+                }
+            });
+            userSearchInput.addEventListener("input", function () {
+                if (userSearchInput.value.trim() === "" && currentSearch !== "") {
+                    searchUsers("");
+                }
+            });
+        }
+
+        if (userRoleSelect instanceof HTMLSelectElement) {
+            userRoleSelect.addEventListener("change", function () {
+                filterUsers();
+            });
+        }
+
+        if (userStatusSelect instanceof HTMLSelectElement) {
+            userStatusSelect.addEventListener("change", function () {
+                filterUsers();
+            });
+        }
+
         setSortButtonState();
 
         document.addEventListener("change", function (event) {

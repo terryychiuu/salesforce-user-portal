@@ -20,14 +20,22 @@ namespace SalesforceManager.Controllers
         {
             try
             {
-                var users = await _salesforceService.GetUsersAsync();
-                return View(users);
+                var usersTask = _salesforceService.GetUsersAsync();
+                var rolesTask = _salesforceService.GetRolesAsync();
+
+                await Task.WhenAll(usersTask, rolesTask);
+
+                return View(new HomeViewModel
+                {
+                    Users = usersTask.Result,
+                    Roles = rolesTask.Result
+                });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Fetch users error.");
                 ViewBag.ErrorMessage = $"Fetch users error. {ex.Message}";
-                return View(Array.Empty<SalesforceUserDto>());
+                return View(new HomeViewModel());
             }
         }
 

@@ -21,11 +21,21 @@ namespace SalesforceManager.Controllers
         public async Task<IActionResult> Users(
             [FromQuery] string? sortBy,
             [FromQuery] string? sortDirection,
+            [FromQuery] string? search,
+            [FromQuery] string? roleId,
+            [FromQuery] string? status,
             CancellationToken cancellationToken)
         {
             try
             {
-                var users = await _salesforceService.GetUsersAsync(sortBy, sortDirection, cancellationToken);
+                var users = await _salesforceService.GetUsersAsync(
+                    sortBy,
+                    sortDirection,
+                    search,
+                    roleId,
+                    status,
+                    cancellationToken
+                );
                 return Ok(users);
             }
             catch (Exception ex)
