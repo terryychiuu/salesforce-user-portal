@@ -3,6 +3,19 @@
     ViewData["Title"] = "Home Page";
 }
 
+<style>
+    .table-cell-truncate {
+        max-width: 200px;
+    }
+    .table-cell-truncate > span {
+        display: block;
+        width: 100%;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+</style>
+
 
 <h2>Salesforce Users</h2>
 @if (!string.IsNullOrWhiteSpace(ViewBag.ErrorMessage))
@@ -87,7 +100,9 @@ else
         {
             <tr>
                 <td class="text-nowrap">@user.Name</td>
-                <td class="text-nowrap">@user.Username</td>
+                <td class="table-cell-truncate">
+                    <span title="@user.Username">@user.Username</span>
+                </td>
                 <td class="text-nowrap">@user.LastLoginDate</td>
                 <td class="text-nowrap">@user.UserRoleId</td>
                 <td>
@@ -178,8 +193,16 @@ else
             return user[camelCaseName] ?? user[pascalCaseName] ?? "";
         }
 
-        function createTextCell(value) {
+        function createTextCell(value, options = {}) {
             const cell = document.createElement("td");
+            if (options.truncate) {
+                const span = document.createElement("span");
+                cell.classList.add("table-cell-truncate");
+                span.textContent = value;
+                span.title = value;
+                cell.appendChild(span);
+                return cell;
+            }
             cell.classList.add("text-nowrap");
             cell.textContent = value;
             return cell;
@@ -211,7 +234,7 @@ else
             users.forEach(function (user) {
                 const row = document.createElement("tr");
                 row.appendChild(createTextCell(readUserProperty(user, "name", "Name")));
-                row.appendChild(createTextCell(readUserProperty(user, "username", "Username")));
+                row.appendChild(createTextCell(readUserProperty(user, "username", "Username"),  { truncate: true }));
                 row.appendChild(createTextCell(readUserProperty(user, "lastLoginDate", "LastLoginDate")));
                 row.appendChild(createTextCell(readUserProperty(user, "userRoleId", "UserRoleId")));
                 row.appendChild(createActiveCell(user));
@@ -479,7 +502,7 @@ else
             const previousChecked = !checkbox.checked;
             const actionText = checkbox.checked ? "activate" : "deactivate";
             const userName = checkbox.dataset.userName || "this user";
-            confirmMessageElement.textContent = `Are you sure you want to ${actionText} ${userName}?`;
+            confirmMessageElement.innerHTML = `Are you sure you want to <strong>${actionText}</strong> <u>${userName}</u>?`;
             pendingChange = { checkbox, userId, previousChecked };
             confirmModal.show();
         });
