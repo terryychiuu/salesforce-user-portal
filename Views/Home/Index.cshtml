@@ -137,7 +137,7 @@ else
                 </th>
                 <th>
                     <button type="button" class="btn btn-link p-0 text-decoration-none text-nowrap js-user-sort" data-sort-by="active">
-                        Active <span class="js-sort-indicator" aria-hidden="true"></span>
+                        Active (<span id="activeUsersCount">@Model.Users.Count(user => user.IsActive)</span>) <span class="js-sort-indicator" aria-hidden="true"></span>
                     </button>
                 </th>
             </tr>
@@ -225,6 +225,7 @@ else
         const userRoleFilterSummary = document.querySelector(".js-user-role-filter-summary");
         const userStatusSelect = document.getElementById("userStatusSelect");
         const userLastLoginSelect = document.getElementById("userLastLoginSelect");
+        const activeUsersCount = document.getElementById("activeUsersCount");
 
         function getUserRoleFilterDisableTargets() {
             if (!userRoleFilterDropdown || !userRoleFilterToggle) {
@@ -302,6 +303,17 @@ else
                 row.appendChild(createActiveCell(user));
                 tableBody.appendChild(row);
             });
+
+            updateActiveUsersCount();
+        }
+
+        function updateActiveUsersCount() {
+            if (!(activeUsersCount instanceof HTMLElement) || !tableBody) {
+                return;
+            }
+
+            const activeCount = tableBody.querySelectorAll(".js-user-active:checked").length;
+            activeUsersCount.textContent = String(activeCount);
         }
 
         function showError(message, detail) {
@@ -558,6 +570,8 @@ else
                 if (!response.ok) {
                     throw new Error(await readProblemDetail(response));
                 }
+
+                updateActiveUsersCount();
             } catch (error) {
                 checkbox.checked = previousChecked;
                 const message = `Unable to ${checkbox.checked ? "deactivate" : "activate"} user`;
