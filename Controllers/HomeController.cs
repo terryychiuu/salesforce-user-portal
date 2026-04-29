@@ -20,8 +20,8 @@ namespace SalesforceManager.Controllers
         {
             try
             {
-                var usersTask = _salesforceService.GetUsersAsync();
-                var rolesTask = _salesforceService.GetRolesAsync();
+                var usersTask = _salesforceService.GetUsers();
+                var rolesTask = _salesforceService.GetRoles();
 
                 await Task.WhenAll(usersTask, rolesTask);
 

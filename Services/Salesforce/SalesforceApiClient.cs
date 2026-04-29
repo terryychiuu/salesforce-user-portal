@@ -22,15 +22,16 @@ namespace SalesforceManager.Services.Salesforce
             _config = options.Value;
         }
 
-        internal async Task<SalesforceUsersResponse> GetUsersAsync(
+        internal async Task<SalesforceUsersResponse> GetUsers(
             string? sortBy = null,
             string? sortDirection = null,
             string? search = null,
-            string? roleId = null,
+            IReadOnlyList<string>? roleId = null,
             string? status = null,
+            string? lastLogin = null,
             CancellationToken cancellationToken = default)
         {
-            var tokenResponse = await AuthenticateAsync(cancellationToken);
+            var tokenResponse = await Authenticate(cancellationToken);
 
             var orderByField = ResolveUsersOrderByField(sortBy);
             var orderByDirection = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase)
@@ -39,13 +40,24 @@ namespace SalesforceManager.Services.Salesforce
                 
             var conditions = new List<string>();
             var normalizedSearch = search?.Trim();
+            string? lastLoginCondition = lastLogin?.Trim().ToLowerInvariant() switch
+            {
+                "within-1d" => "LastLoginDate >= LAST_N_DAYS:1",
+                "within-7d" => "LastLoginDate >= LAST_N_DAYS:7",
+                "within-30d" => "LastLoginDate >= LAST_N_DAYS:30",
+                "older-30d" => "LastLoginDate < LAST_N_DAYS:30",
+                "older-90d" => "LastLoginDate < LAST_N_DAYS:90",
+                null => null,
+                "" => null,
+                _ => null
+            };
             string? isActive = status?.Trim().ToLowerInvariant() switch
             {
                 "active" => "true",
                 "inactive" => "false",
                 "all" => null,
-                "" => null,
                 null => null,
+                "" => null,
                 _ => null
             };
 
@@ -55,15 +67,31 @@ namespace SalesforceManager.Services.Salesforce
                 conditions.Add($"(Name LIKE '%{escapedSearch}%' OR Username LIKE '%{escapedSearch}%')");
             }
 
-            if (!string.IsNullOrWhiteSpace(roleId))
+            var roleIds = (roleId ?? Array.Empty<string>())
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            if (roleIds.Count == 1)
             {
-                conditions.Add($"UserRoleId = '{EscapeSoqlStringLiteral(roleId)}'");
+                conditions.Add($"UserRoleId = '{EscapeSoqlStringLiteral(roleIds[0])}'");
+            }
+            else if (roleIds.Count > 1)
+            {
+                var inList = string.Join(", ", roleIds.Select(id => $"'{EscapeSoqlStringLiteral(id)}'"));
+                conditions.Add($"UserRoleId IN ({inList})");
             }
 
             if (!string.IsNullOrWhiteSpace(isActive))
             {
                 conditions.Add($"IsActive = {isActive}");
             }
+
+            if (!string.IsNullOrWhiteSpace(lastLogin))
+            {
+                conditions.Add($"{lastLoginCondition}");
+            }
+            
             var whereClause = conditions.Count > 0
                 ? $"WHERE {string.Join(" AND ", conditions)} "
                 : string.Empty;
@@ -104,9 +132,9 @@ namespace SalesforceManager.Services.Salesforce
             return value.Replace("\\", "\\\\").Replace("'", "\\'");
         }
 
-        internal async Task PatchUserIsActiveAsync(string userId, bool isActive, CancellationToken cancellationToken = default)
+        internal async Task PatchUserIsActive(string userId, bool isActive, CancellationToken cancellationToken = default)
         {
-            var tokenResponse = await AuthenticateAsync(cancellationToken);
+            var tokenResponse = await Authenticate(cancellationToken);
             var patchUrl = $"{tokenResponse.InstanceUrl}/services/data/v53.0/sobjects/User/{Uri.EscapeDataString(userId)}";
             using var request = new HttpRequestMessage(HttpMethod.Patch, patchUrl)
             {
@@ -124,9 +152,9 @@ namespace SalesforceManager.Services.Salesforce
                 throw new InvalidOperationException(payload);
         }
 
-        internal async Task<SalesforceRolesResponse> GetRolesAsync(CancellationToken cancellationToken = default)
+        internal async Task<SalesforceRolesResponse> GetRoles(CancellationToken cancellationToken = default)
         {
-            var tokenResponse = await AuthenticateAsync(cancellationToken);
+            var tokenResponse = await Authenticate(cancellationToken);
             var soql = "" +
                 "SELECT Id, Name " +
                 "FROM UserRole " +
@@ -147,7 +175,7 @@ namespace SalesforceManager.Services.Salesforce
                 ?? new SalesforceRolesResponse();
         }
         
-        private async Task<SalesforceTokenResponse> AuthenticateAsync(CancellationToken cancellationToken)
+        private async Task<SalesforceTokenResponse> Authenticate(CancellationToken cancellationToken)
         {
             var tokenEndpoint = $"{_config.Url}/services/oauth2/token";
             var form = new Dictionary<string, string>

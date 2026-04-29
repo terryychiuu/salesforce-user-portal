@@ -22,18 +22,20 @@ namespace SalesforceManager.Controllers
             [FromQuery] string? sortBy,
             [FromQuery] string? sortDirection,
             [FromQuery] string? search,
-            [FromQuery] string? roleId,
+            [FromQuery] List<string>? roleId,
             [FromQuery] string? status,
+            [FromQuery] string? lastLogin,
             CancellationToken cancellationToken)
         {
             try
             {
-                var users = await _salesforceService.GetUsersAsync(
+                var users = await _salesforceService.GetUsers(
                     sortBy,
                     sortDirection,
                     search,
                     roleId,
                     status,
+                    lastLogin,
                     cancellationToken
                 );
                 return Ok(users);
@@ -53,7 +55,7 @@ namespace SalesforceManager.Controllers
         {
             try
             {
-                var roles = await _salesforceService.GetRolesAsync(cancellationToken);
+                var roles = await _salesforceService.GetRoles(cancellationToken);
                 return Ok(roles);
             }
             catch (Exception ex)
@@ -80,7 +82,7 @@ namespace SalesforceManager.Controllers
 
             try
             {
-                await _salesforceService.UpdateUserActiveStatusAsync(
+                await _salesforceService.UpdateUserActiveStatus(
                     userId,
                     isActive: !request.Inactive.Value,
                     cancellationToken);

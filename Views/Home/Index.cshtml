@@ -14,6 +14,11 @@
         white-space: nowrap;
         text-overflow: ellipsis;
     }
+    .user-role-filter-menu {
+        max-height: 16rem;
+        overflow-y: auto;
+        min-width: 100%;
+    }
 </style>
 
 
@@ -33,7 +38,7 @@ else
 {
     <form id="userSearchForm" class="mb-3">
         <div class="row">
-            <div class="col-12 col-md-8">
+            <div class="col-12 col-md-6">
                 <div class="input-group">
                     <span class="input-group-text">
                         <i class="bi bi-search" aria-hidden="true"></i>
@@ -48,13 +53,55 @@ else
                 </div>
             </div>
             <div class="col-12 col-md-2">
-                <select id="userRoleSelect" class="form-select">
-                    <option value="" selected>All roles</option>
-                    @foreach (var role in Model.Roles)
-                    {
-                        <option value="@role.Id">@role.Name</option>
-                    }
+                <select id="userLastLoginSelect" class="form-select" aria-label="Filter by last login">
+                    <option value="" selected>All last logins</option>
+                    <option value="within-1d">Last 24 hours</option>
+                    <option value="within-7d">Last 7 days</option>
+                    <option value="within-30d">Last 30 days</option>
+                    <option value="older-30d">> 30 days ago</option>
+                    <option value="older-90d">> 90 days ago</option>
                 </select>
+            </div>
+            <div class="col-12 col-md-2">
+                <label id="userRoleFilterLabel" class="form-label visually-hidden">Filter by role</label>
+                <div id="userRoleFilterDropdown" class="dropdown w-100">
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary dropdown-toggle w-100 text-start d-flex justify-content-between align-items-center gap-1"
+                        id="userRoleFilterToggle"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        aria-haspopup="true"
+                        aria-controls="userRoleFilterMenu"
+                        aria-labelledby="userRoleFilterLabel userRoleFilterToggle">
+                        <span class="text-truncate flex-grow-1 js-user-role-filter-summary">All roles</span>
+                    </button>
+                    <div
+                        class="dropdown-menu user-role-filter-menu p-2"
+                        id="userRoleFilterMenu"
+                        aria-labelledby="userRoleFilterToggle">
+                        <div class="form-check">
+                            <input class="form-check-input js-role-filter-all" type="checkbox" id="userRoleFilterAll" checked />
+                            <label class="form-check-label" for="userRoleFilterAll">All roles</label>
+                        </div>
+                        <hr class="dropdown-divider my-1" />
+                        @{ var roleFilterIndex = 0; }
+                        @foreach (var role in Model.Roles)
+                        {
+                            var roleCbId = $"userRoleFilterRole{roleFilterIndex}";
+                            roleFilterIndex++;
+                            <div class="form-check">
+                                <input
+                                    class="form-check-input js-role-filter-role"
+                                    type="checkbox"
+                                    value="@role.Id"
+                                    id="@roleCbId"
+                                    data-role-name="@role.Name" />
+                                <label class="form-check-label text-truncate d-block" for="@roleCbId" title="@role.Name">@role.Name</label>
+                            </div>
+                        }
+                    </div>
+                </div>
             </div>
             <div class="col-12 col-md-2">
                 <select id="userStatusSelect" class="form-select">
@@ -171,8 +218,23 @@ else
         const userSearchForm = document.getElementById("userSearchForm");
         const userSearchInput = document.getElementById("userSearchInput");
         const userSearchButton = document.getElementById("userSearchButton");
-        const userRoleSelect = document.getElementById("userRoleSelect");
+        const userRoleFilterDropdown = document.getElementById("userRoleFilterDropdown");
+        const userRoleFilterToggle = document.getElementById("userRoleFilterToggle");
+        const userRoleFilterMenu = document.getElementById("userRoleFilterMenu");
+        const userRoleFilterAll = document.getElementById("userRoleFilterAll");
+        const userRoleFilterSummary = document.querySelector(".js-user-role-filter-summary");
         const userStatusSelect = document.getElementById("userStatusSelect");
+        const userLastLoginSelect = document.getElementById("userLastLoginSelect");
+
+        function getUserRoleFilterDisableTargets() {
+            if (!userRoleFilterDropdown || !userRoleFilterToggle) {
+                return [];
+            }
+
+            return [userRoleFilterToggle].concat(
+                Array.from(userRoleFilterDropdown.querySelectorAll("input[type='checkbox']"))
+            );
+        }
 
         const confirmModalElement = document.getElementById("userActiveConfirmModal");
         const confirmMessageElement = document.getElementById("userActiveConfirmMessage");
@@ -291,6 +353,13 @@ else
         }
 
         function setControlsDisabled(disabled, controls) {
+            controls = [
+                sortButtons, 
+                userSearchInput, 
+                userSearchButton, 
+                userStatusSelect,
+                userLastLoginSelect
+            ].concat(getUserRoleFilterDisableTargets());
             controls.forEach(function (control) {
                 if (control instanceof HTMLInputElement || control instanceof HTMLButtonElement || control instanceof HTMLSelectElement) {
                     control.disabled = disabled;
@@ -307,12 +376,56 @@ else
             });
         }
 
+        function getSelectedRoleIds() {
+            if (!userRoleFilterDropdown) {
+                return [];
+            }
+
+            return Array.from(userRoleFilterDropdown.querySelectorAll(".js-role-filter-role:checked"))
+                .map(function (input) {
+                    return input.value;
+                })
+                .filter(function (value) {
+                    return value !== "";
+                });
+        }
+
+        function updateUserRoleFilterSummary() {
+            if (!(userRoleFilterSummary instanceof HTMLElement)) {
+                return;
+            }
+            const checkedRoles = Array.from(
+                (userRoleFilterDropdown || document).querySelectorAll(".js-role-filter-role:checked")
+            );
+            if (checkedRoles.length === 0) {
+                userRoleFilterSummary.textContent = "All roles";
+                return;
+            }
+            if (checkedRoles.length === 1) {
+                const name = checkedRoles[0].dataset.roleName || checkedRoles[0].value;
+                userRoleFilterSummary.textContent = name;
+                return;
+            }
+            const firstName = checkedRoles[0].dataset.roleName || checkedRoles[0].value;
+            userRoleFilterSummary.textContent = `${firstName} +${checkedRoles.length - 1}`;
+        }
+
+        function syncUserRoleFilterAllState() {
+            if (!(userRoleFilterAll instanceof HTMLInputElement) || !userRoleFilterDropdown) {
+                return;
+            }
+            const anyRoleChecked = userRoleFilterDropdown.querySelector(".js-role-filter-role:checked");
+            userRoleFilterAll.checked = !anyRoleChecked;
+            updateUserRoleFilterSummary();
+        }
+
         function buildUsersQuery(
             sortBy, 
             sortDirection, 
             search,
-            roleId,
-            status
+            roleIds,
+            status,
+            lastLogin
         ) {
             const query = new URLSearchParams();
 
@@ -325,11 +438,16 @@ else
             if (search) {
                 query.append("search", search);
             }
-            if (roleId) {
-                query.append("roleId", roleId);
+            if (roleIds && roleIds.length > 0) {
+                roleIds.forEach(function (id) {
+                    query.append("roleId", id);
+                });
             }
             if (status) {
                 query.append("status", status);
+            }
+            if (lastLogin) {
+                query.append("lastLogin", lastLogin);
             }
 
             return query;
@@ -343,12 +461,13 @@ else
                 sortBy, 
                 nextDirection, 
                 currentSearch, 
-                userRoleSelect.value, 
-                userStatusSelect.value
+                getSelectedRoleIds(), 
+                userStatusSelect.value,
+                userLastLoginSelect.value
             );
             // console.log(query.toString());
 
-            setControlsDisabled(true, [sortButtons, userSearchInput, userSearchButton, userRoleSelect, userStatusSelect]);
+            setControlsDisabled(true);
 
             try {
                 const response = await fetch(`/api/sf/users?${query.toString()}`);
@@ -363,7 +482,7 @@ else
             } catch (error) {
                 showError("Unable to sort users", error.message);
             } finally {
-                setControlsDisabled(false, [sortButtons, userSearchInput, userSearchButton, userRoleSelect, userStatusSelect]);
+                setControlsDisabled(false);
             }
         }
 
@@ -373,10 +492,11 @@ else
                 currentSortBy, 
                 currentSortDirection, 
                 normalizedSearch, 
-                userRoleSelect.value, 
-                userStatusSelect.value
+                getSelectedRoleIds(), 
+                userStatusSelect.value,
+                userLastLoginSelect.value
             );
-            setControlsDisabled(true, [sortButtons, userSearchInput, userSearchButton]);
+            setControlsDisabled(true);
 
             try {
                 const response = await fetch(`/api/sf/users?${query.toString()}`);
@@ -390,7 +510,7 @@ else
             } catch (error) {
                 showError("Unable to search users", error.message);
             } finally {
-                setControlsDisabled(false, [sortButtons, userSearchInput, userSearchButton]);
+                setControlsDisabled(false);
             }
         }
 
@@ -399,10 +519,11 @@ else
                 currentSortBy,
                 currentSortDirection,
                 currentSearch,
-                userRoleSelect.value,
-                userStatusSelect.value
+                getSelectedRoleIds(),
+                userStatusSelect.value,
+                userLastLoginSelect.value
             );
-            setControlsDisabled(true, [sortButtons, userSearchInput, userSearchButton, userRoleSelect, userStatusSelect]);
+            setControlsDisabled(true);
 
             try {
                 const response = await fetch(`/api/sf/users?${query.toString()}`);
@@ -415,7 +536,7 @@ else
             } catch (error) {
                 showError("Unable to filter users", error.message);
             } finally {
-                setControlsDisabled(false, [sortButtons, userSearchInput, userSearchButton, userRoleSelect, userStatusSelect]);
+                setControlsDisabled(false);
             }
         }
 
@@ -469,14 +590,58 @@ else
             });
         }
 
-        if (userRoleSelect instanceof HTMLSelectElement) {
-            userRoleSelect.addEventListener("change", function () {
-                filterUsers();
+        if (userRoleFilterMenu instanceof HTMLElement) {
+            userRoleFilterMenu.addEventListener("mousedown", function (event) {
+                event.stopPropagation();
+            });
+        }
+
+        if (userRoleFilterDropdown && userRoleFilterAll instanceof HTMLInputElement) {
+            userRoleFilterDropdown.addEventListener("change", function (event) {
+                const target = event.target;
+                if (!(target instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                if (target.classList.contains("js-role-filter-all")) {
+                    if (target.checked) {
+                        userRoleFilterDropdown.querySelectorAll(".js-role-filter-role").forEach(function (cb) {
+                            if (cb instanceof HTMLInputElement) {
+                                cb.checked = false;
+                            }
+                        });
+                    } else {
+                        const anyRole = userRoleFilterDropdown.querySelector(".js-role-filter-role:checked");
+                        if (!anyRole) {
+                            target.checked = true;
+                            return;
+                        }
+                    }
+
+                    updateUserRoleFilterSummary();
+                    filterUsers();
+                    return;
+                }
+
+                if (target.classList.contains("js-role-filter-role")) {
+                    if (target.checked) {
+                        userRoleFilterAll.checked = false;
+                    }
+
+                    syncUserRoleFilterAllState();
+                    filterUsers();
+                }
             });
         }
 
         if (userStatusSelect instanceof HTMLSelectElement) {
             userStatusSelect.addEventListener("change", function () {
+                filterUsers();
+            });
+        }
+
+        if (userLastLoginSelect instanceof HTMLSelectElement) {
+            userLastLoginSelect.addEventListener("change", function () {
                 filterUsers();
             });
         }

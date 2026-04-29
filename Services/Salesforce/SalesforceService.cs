@@ -12,25 +12,27 @@ namespace SalesforceManager.Services.Salesforce
             _salesforceApiClient = salesforceApiClient;
         }
 
-        public Task<IReadOnlyList<SalesforceUserDto>> GetUsersAsync(CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<SalesforceUserDto>> GetUsers(CancellationToken cancellationToken = default)
         {
-            return GetUsersAsync(null, null, null, null, null, cancellationToken);
+            return GetUsers(null, null, null, null, null, null, cancellationToken);
         }
 
-        public async Task<IReadOnlyList<SalesforceUserDto>> GetUsersAsync(
+        public async Task<IReadOnlyList<SalesforceUserDto>> GetUsers(
             string? sortBy,
             string? sortDirection,
             string? search,
-            string? roleId,
+            IReadOnlyList<string>? roleId,
             string? status,
+            string? lastLogin,
             CancellationToken cancellationToken = default)
         {
-            var usersResponse = await _salesforceApiClient.GetUsersAsync(
+            var usersResponse = await _salesforceApiClient.GetUsers(
                 sortBy,
                 sortDirection,
                 search,
                 roleId,
                 status,
+                lastLogin,
                 cancellationToken
             );
 
@@ -42,9 +44,9 @@ namespace SalesforceManager.Services.Salesforce
                 .ToList();
         }
 
-        public async Task<IReadOnlyList<SalesforceRoleDto>> GetRolesAsync(CancellationToken cancellationToken = default)
+        public async Task<IReadOnlyList<SalesforceRoleDto>> GetRoles(CancellationToken cancellationToken = default)
         {
-            var rolesResponse = await _salesforceApiClient.GetRolesAsync(cancellationToken);
+            var rolesResponse = await _salesforceApiClient.GetRoles(cancellationToken);
 
             if (rolesResponse?.Records == null)
                 return Array.Empty<SalesforceRoleDto>();
@@ -54,9 +56,9 @@ namespace SalesforceManager.Services.Salesforce
                 .ToList();
         }
 
-        public Task UpdateUserActiveStatusAsync(string userId, bool isActive, CancellationToken cancellationToken = default)
+        public Task UpdateUserActiveStatus(string userId, bool isActive, CancellationToken cancellationToken = default)
         {
-            return _salesforceApiClient.PatchUserIsActiveAsync(userId, isActive, cancellationToken);
+            return _salesforceApiClient.PatchUserIsActive(userId, isActive, cancellationToken);
         }
     }
 }
