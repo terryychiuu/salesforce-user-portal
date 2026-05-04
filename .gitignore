@@ -27,4 +27,5 @@ packages/
 
 # ASP.NET Core / local secrets
 appsettings.*.local.json
+appsettings.Development.json
 secrets.json
