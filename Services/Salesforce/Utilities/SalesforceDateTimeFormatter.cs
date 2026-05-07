@@ -20,7 +20,7 @@ namespace SalesforceManager.Services.Salesforce.Utilities
                 return rawDateTime;
             }
 
-            return parsed.ToString("d/M/yyyy, h:mm tt", CultureInfo.InvariantCulture).ToLowerInvariant();
+            return parsed.ToString("d MMM yyyy, h:mm tt", CultureInfo.InvariantCulture).Replace("AM", "am").Replace("PM", "pm");
         }
     }
 }

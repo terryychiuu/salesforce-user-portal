@@ -197,6 +197,27 @@ namespace SalesforceManager.Services.Salesforce
             return JsonSerializer.Deserialize<SalesforceRolesResponse>(payload, JsonOptions)
                 ?? new SalesforceRolesResponse();
         }
+
+        internal async Task<int> GetActiveUsersCount(CancellationToken cancellationToken = default)
+        {
+            var tokenResponse = await Authenticate(cancellationToken);
+            var soql = "SELECT count() FROM User WHERE IsActive = true";
+            var queryUrl = $"{_config.Url}/services/data/v53.0/query?q={Uri.EscapeDataString(soql)}";
+            
+            using var request = new HttpRequestMessage(HttpMethod.Get, queryUrl);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenResponse.AccessToken);
+            
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+            
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException(payload);
+            
+            var countResponse = JsonSerializer.Deserialize<SalesforceUsersResponse>(payload, JsonOptions)
+                ?? new SalesforceUsersResponse();
+            
+            return countResponse.TotalSize;
+        }
         
         private async Task<SalesforceTokenResponse> Authenticate(CancellationToken cancellationToken)
         {

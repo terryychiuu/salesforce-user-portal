@@ -29,13 +29,15 @@ namespace SalesforceManager.Controllers
             {
                 var usersTask = _salesforceService.GetUsers();
                 var rolesTask = _salesforceService.GetRoles();
+                var activeUsersCountTask = _salesforceService.GetActiveUsersCount();
 
-                await Task.WhenAll(usersTask, rolesTask);
+                await Task.WhenAll(usersTask, rolesTask, activeUsersCountTask);
 
                 return View(new HomeViewModel
                 {
                     Users = usersTask.Result,
                     Roles = rolesTask.Result,
+                    ActiveUsersTotal = activeUsersCountTask.Result,
                     AdminUsernames = _salesforceConfig.AdminUsernames ?? []
                 });
             }

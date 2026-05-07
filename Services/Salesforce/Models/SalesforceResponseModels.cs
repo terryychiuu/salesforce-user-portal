@@ -15,6 +15,9 @@ namespace SalesforceManager.Services.Salesforce.Models
     {
         [JsonPropertyName("records")]
         public List<SalesforceUserRecord> Records { get; set; } = [];
+
+        [JsonPropertyName("totalSize")]
+        public int TotalSize { get; set; }
     }
 
     internal sealed class SalesforceRolesResponse

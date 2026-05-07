@@ -139,7 +139,7 @@ else
                 </th>
                 <th>
                     <button type="button" class="btn btn-link p-0 text-decoration-none text-nowrap js-user-sort" data-sort-by="active">
-                        Active (<span id="activeUsersCount">@Model.Users.Count(user => user.IsActive)</span>) <span class="js-sort-indicator" aria-hidden="true"></span>
+                        Active (<span id="activeUsersCount">@Model.ActiveUsersTotal</span>) <span class="js-sort-indicator" aria-hidden="true"></span>
                     </button>
                 </th>
             </tr>
@@ -236,6 +236,8 @@ else
             @Html.Raw(JsonSerializer.Serialize(Model?.AdminUsernames ?? Array.Empty<string>()))
         );
 
+        let gActiveUsersCount = @Model.ActiveUsersTotal;
+
         function isAdminUser(username) {
             return adminUsernames.has(username);
         }
@@ -314,17 +316,24 @@ else
                 row.appendChild(createActiveCell(user));
                 tableBody.appendChild(row);
             });
-
-            updateActiveUsersCount();
         }
 
-        function updateActiveUsersCount() {
-            if (!(activeUsersCount instanceof HTMLElement) || !tableBody) {
+        function renderActiveUsersCount() {
+            if (!(activeUsersCount instanceof HTMLElement)) {
                 return;
             }
+            activeUsersCount.textContent = String(gActiveUsersCount);
+        }
 
-            const activeCount = tableBody.querySelectorAll(".js-user-active:checked").length;
-            activeUsersCount.textContent = String(activeCount);
+        function updateGlobalActiveUsersCount(previousChecked, currentChecked) {
+            if (previousChecked === currentChecked) {
+                return;
+            }
+            gActiveUsersCount += currentChecked ? 1 : -1;
+            if (gActiveUsersCount < 0) {
+                gActiveUsersCount = 0;
+            }
+            renderActiveUsersCount();
         }
 
         function showError(message, detail) {
@@ -582,7 +591,7 @@ else
                     throw new Error(await readProblemDetail(response));
                 }
 
-                updateActiveUsersCount();
+                updateGlobalActiveUsersCount(previousChecked, checkbox.checked);
             } catch (error) {
                 checkbox.checked = previousChecked;
                 const message = `Unable to ${checkbox.checked ? "deactivate" : "activate"} user`;
@@ -672,6 +681,7 @@ else
         }
 
         setSortButtonState();
+        renderActiveUsersCount();
 
         document.addEventListener("change", function (event) {
             const checkbox = event.target;

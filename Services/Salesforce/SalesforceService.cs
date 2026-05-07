@@ -56,6 +56,11 @@ namespace SalesforceManager.Services.Salesforce
                 .ToList();
         }
 
+        public Task<int> GetActiveUsersCount(CancellationToken cancellationToken = default)
+        {
+            return _salesforceApiClient.GetActiveUsersCount(cancellationToken);
+        }
+
         public Task UpdateUserActiveStatus(string userId, bool isActive, CancellationToken cancellationToken = default)
         {
             return _salesforceApiClient.PatchUserIsActive(userId, isActive, cancellationToken);
