@@ -64,7 +64,7 @@ namespace SalesforceManager.Services.Salesforce
             if (!string.IsNullOrWhiteSpace(normalizedSearch))
             {
                 var escapedSearch = EscapeSoqlStringLiteral(normalizedSearch);
-                conditions.Add($"(Name LIKE '%{escapedSearch}%' OR Username LIKE '%{escapedSearch}%')");
+                conditions.Add($"(Name LIKE '%{escapedSearch}%')");
             }
 
             var roleIds = (roleId ?? Array.Empty<string>())
@@ -150,6 +150,29 @@ namespace SalesforceManager.Services.Salesforce
 
             if (!response.IsSuccessStatusCode)
                 throw new InvalidOperationException(payload);
+        }
+
+        internal async Task<SalesforceUserRecord?> GetUserById(string userId, CancellationToken cancellationToken = default)
+        {
+            var tokenResponse = await Authenticate(cancellationToken);
+            var soql = "" +
+                "SELECT Id, Name, Alias, Username, LastLoginDate, UserRoleId, UserRole.Name, IsActive " +
+                "FROM User " +
+                $"WHERE Id = '{EscapeSoqlStringLiteral(userId)}' " +
+                "LIMIT 1";
+            var queryUrl = $"{_config.Url}/services/data/v53.0/query?q={Uri.EscapeDataString(soql)}";
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, queryUrl);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenResponse.AccessToken);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException(payload);
+
+            var usersResponse = JsonSerializer.Deserialize<SalesforceUsersResponse>(payload, JsonOptions);
+            return usersResponse?.Records?.FirstOrDefault();
         }
 
         internal async Task<SalesforceRolesResponse> GetRoles(CancellationToken cancellationToken = default)

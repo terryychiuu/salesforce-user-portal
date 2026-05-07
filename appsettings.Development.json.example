@@ -10,6 +10,9 @@
         "ClientId": "YOUR_CONNECTED_APP_CONSUMER_KEY",
         "ClientSecret": "YOUR_CONNECTED_APP_CONSUMER_SECRET",
         "Username": "user@example.com.sandbox1",
-        "Password": "YOUR_PASSWORD_OR_PASSWORD_PLUS_SECURITY_TOKEN"
+        "Password": "YOUR_PASSWORD_OR_PASSWORD_PLUS_SECURITY_TOKEN",
+        "AdminUsernames": [
+            "user@example.com.sandbox1"
+        ]
     }
 }

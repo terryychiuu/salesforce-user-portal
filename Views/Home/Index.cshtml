@@ -1,6 +1,8 @@
+@using System.Text.Json
 @model SalesforceManager.Models.HomeViewModel
 @{
     ViewData["Title"] = "Home Page";
+    var adminUsernames = new HashSet<string>(Model?.AdminUsernames ?? Array.Empty<string>());
 }
 
 <style>
@@ -120,11 +122,11 @@ else
                         Name <span class="js-sort-indicator" aria-hidden="true"></span>
                     </button>
                 </th>
-                <th>
-                    <button type="button" class="btn btn-link p-0 text-decoration-none text-nowrap js-user-sort" data-sort-by="username">
+                @*<th>
+                     <button type="button" class="btn btn-link p-0 text-decoration-none text-nowrap js-user-sort" data-sort-by="username">
                         Username <span class="js-sort-indicator" aria-hidden="true"></span>
                     </button>
-                </th>
+                </th> *@
                 <th>
                     <button type="button" class="btn btn-link p-0 text-decoration-none text-nowrap js-user-sort" data-sort-by="lastlogindate">
                         Last Login <span class="js-sort-indicator" aria-hidden="true"></span>
@@ -145,11 +147,12 @@ else
         <tbody id="salesforceUsersTableBody">
         @foreach (var user in Model.Users)
         {
+            var isAdminUser = adminUsernames.Contains(user.Username);
             <tr>
-                <td class="text-nowrap">@user.Name</td>
-                <td class="table-cell-truncate">
+                <td class="text-nowrap"><span title="@user.Username">@user.Name</span></td>
+                @* <td class="table-cell-truncate">
                     <span title="@user.Username">@user.Username</span>
-                </td>
+                </td> *@
                 <td class="text-nowrap">@user.LastLoginDate</td>
                 <td class="text-nowrap">@user.UserRoleId</td>
                 <td>
@@ -158,6 +161,9 @@ else
                         class="js-user-active"
                         data-user-id="@user.Id"
                         data-user-name="@user.Name"
+                        data-user-username="@user.Username"
+                        title="@(isAdminUser ? "Activation cannot be changed for this user." : null)"
+                        @(isAdminUser ? "disabled" : "")
                         @(user.IsActive ? "checked" : "") />
                 </td>
             </tr>
@@ -226,6 +232,13 @@ else
         const userStatusSelect = document.getElementById("userStatusSelect");
         const userLastLoginSelect = document.getElementById("userLastLoginSelect");
         const activeUsersCount = document.getElementById("activeUsersCount");
+        const adminUsernames = new Set(
+            @Html.Raw(JsonSerializer.Serialize(Model?.AdminUsernames ?? Array.Empty<string>()))
+        );
+
+        function isAdminUser(username) {
+            return adminUsernames.has(username);
+        }
 
         function getUserRoleFilterDisableTargets() {
             if (!userRoleFilterDropdown || !userRoleFilterToggle) {
@@ -252,17 +265,13 @@ else
         let currentSortDirection = "asc";
         let currentSearch = "";
 
-        function readUserProperty(user, camelCaseName, pascalCaseName) {
-            return user[camelCaseName] ?? user[pascalCaseName] ?? "";
-        }
-
         function createTextCell(value, options = {}) {
             const cell = document.createElement("td");
             if (options.truncate) {
                 const span = document.createElement("span");
-                cell.classList.add("table-cell-truncate");
+                // cell.classList.add("table-cell-truncate");
                 span.textContent = value;
-                span.title = value;
+                span.title = options.value;
                 cell.appendChild(span);
                 return cell;
             }
@@ -272,17 +281,19 @@ else
         }
 
         function createActiveCell(user) {
-            const userId = readUserProperty(user, "id", "Id");
-            const userName = readUserProperty(user, "name", "Name");
-            const isActive = Boolean(user.isActive ?? user.IsActive);
             const cell = document.createElement("td");
             const checkbox = document.createElement("input");
 
             checkbox.type = "checkbox";
             checkbox.className = "js-user-active";
-            checkbox.dataset.userId = userId;
-            checkbox.dataset.userName = userName;
-            checkbox.checked = isActive;
+            checkbox.dataset.userId = user.id ?? "";
+            checkbox.dataset.userName = user.name ?? "";
+            checkbox.dataset.userUsername = user.username ?? "";
+            checkbox.checked = Boolean(user.isActive);
+            if (isAdminUser(user.username)) {
+                checkbox.disabled = true;
+                checkbox.title = "Activation cannot be changed for this user.";
+            }
             cell.appendChild(checkbox);
 
             return cell;
@@ -296,10 +307,10 @@ else
             tableBody.innerHTML = "";
             users.forEach(function (user) {
                 const row = document.createElement("tr");
-                row.appendChild(createTextCell(readUserProperty(user, "name", "Name")));
-                row.appendChild(createTextCell(readUserProperty(user, "username", "Username"),  { truncate: true }));
-                row.appendChild(createTextCell(readUserProperty(user, "lastLoginDate", "LastLoginDate")));
-                row.appendChild(createTextCell(readUserProperty(user, "userRoleId", "UserRoleId")));
+                row.appendChild(createTextCell(user.name ?? "", { truncate: true, value: user.username ?? "" }));
+                @* row.appendChild(createTextCell(user.username ?? "",  { truncate: true })); *@
+                row.appendChild(createTextCell(user.lastLoginDate ?? ""));
+                row.appendChild(createTextCell(user.userRoleId ?? ""));
                 row.appendChild(createActiveCell(user));
                 tableBody.appendChild(row);
             });
@@ -670,6 +681,11 @@ else
 
             const userId = checkbox.dataset.userId;
             if (!userId) {
+                return;
+            }
+
+            if (isAdminUser(checkbox.dataset.userUsername)) {
+                checkbox.checked = !checkbox.checked;
                 return;
             }
 

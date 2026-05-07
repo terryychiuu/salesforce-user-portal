@@ -60,5 +60,11 @@ namespace SalesforceManager.Services.Salesforce
         {
             return _salesforceApiClient.PatchUserIsActive(userId, isActive, cancellationToken);
         }
+
+        public async Task<SalesforceUserDto?> GetUserById(string userId, CancellationToken cancellationToken = default)
+        {
+            var user = await _salesforceApiClient.GetUserById(userId, cancellationToken);
+            return user is null ? null : SalesforceUserMapper.ToDto(user);
+        }
     }
 }

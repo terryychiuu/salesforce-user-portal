@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using SalesforceManager.Models;
 using SalesforceManager.Services.Salesforce;
+using SalesforceManager.Services.Salesforce.Configuration;
 
 namespace SalesforceManager.Controllers
 {
@@ -10,11 +12,16 @@ namespace SalesforceManager.Controllers
     {
         private readonly ILogger<SalesforceController> _logger;
         private readonly SalesforceService _salesforceService;
+        private readonly HashSet<string> _adminUsernames;
 
-        public SalesforceController(ILogger<SalesforceController> logger, SalesforceService salesforceService)
+        public SalesforceController(
+            ILogger<SalesforceController> logger,
+            SalesforceService salesforceService,
+            IOptions<SalesforceConfig> salesforceOptions)
         {
             _logger = logger;
             _salesforceService = salesforceService;
+            _adminUsernames = new HashSet<string>(salesforceOptions.Value.AdminUsernames ?? []);
         }
 
         [HttpGet("users")]
@@ -82,6 +89,18 @@ namespace SalesforceManager.Controllers
 
             try
             {
+                var user = await _salesforceService.GetUserById(userId, cancellationToken);
+                if (user is null)
+                    return NotFound("User was not found.");
+
+                if (_adminUsernames.Contains(user.Username))
+                {
+                    return Problem(
+                        title: "Activation update blocked.",
+                        detail: "Activation cannot be changed for this user.",
+                        statusCode: StatusCodes.Status403Forbidden);
+                }
+
                 await _salesforceService.UpdateUserActiveStatus(
                     userId,
                     isActive: !request.Inactive.Value,

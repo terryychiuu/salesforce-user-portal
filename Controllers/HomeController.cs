@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using SalesforceManager.Models;
 using SalesforceManager.Services.Salesforce;
+using SalesforceManager.Services.Salesforce.Configuration;
 using System.Diagnostics;
 
 namespace SalesforceManager.Controllers
@@ -9,11 +11,16 @@ namespace SalesforceManager.Controllers
     {
         private readonly ILogger<HomeController> _logger;
         private readonly SalesforceService _salesforceService;
+        private readonly SalesforceConfig _salesforceConfig;
 
-        public HomeController(ILogger<HomeController> logger, SalesforceService salesforceService)
+        public HomeController(
+            ILogger<HomeController> logger,
+            SalesforceService salesforceService,
+            IOptions<SalesforceConfig> salesforceOptions)
         {
             _logger = logger;
             _salesforceService = salesforceService;
+            _salesforceConfig = salesforceOptions.Value;
         }
 
         public async Task<IActionResult> Index()
@@ -28,7 +35,8 @@ namespace SalesforceManager.Controllers
                 return View(new HomeViewModel
                 {
                     Users = usersTask.Result,
-                    Roles = rolesTask.Result
+                    Roles = rolesTask.Result,
+                    AdminUsernames = _salesforceConfig.AdminUsernames ?? []
                 });
             }
             catch (Exception ex)

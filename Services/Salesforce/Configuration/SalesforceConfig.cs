@@ -11,5 +11,7 @@ namespace SalesforceManager.Services.Salesforce.Configuration
         public string Username { get; set; } = string.Empty;
         
         public string Password { get; set; } = string.Empty;
+
+        public List<string> AdminUsernames { get; set; } = [];
     }
 }
